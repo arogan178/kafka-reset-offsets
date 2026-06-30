@@ -1,0 +1,46 @@
+{
+  "name": "kafka-reset-offsets",
+  "version": "0.1.0",
+  "description": "Interactive CLI for safely resetting Kafka consumer group offsets by date or timestamp.",
+  "license": "MIT",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/arogan178/kafka-reset-offsets.git"
+  },
+  "bugs": {
+    "url": "https://github.com/arogan178/kafka-reset-offsets/issues"
+  },
+  "homepage": "https://github.com/arogan178/kafka-reset-offsets#readme",
+  "bin": {
+    "kafka-reset-offsets": "./dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "dev": "tsx src/cli.ts",
+    "build": "tsup src/cli.ts --format esm --target node20 --out-dir dist --clean",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "check": "pnpm typecheck && pnpm test && pnpm build",
+    "pack:release": "pnpm build && pnpm pack"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@11.9.0",
+  "dependencies": {
+    "@inquirer/prompts": "^8.5.2",
+    "commander": "^15.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "tsup": "^8.5.1",
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
+  }
+}
