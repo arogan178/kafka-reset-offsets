@@ -31,6 +31,8 @@ export interface NormalizedDateTime {
   kafkaDateTime: string;
   note: string;
   timezone: TimezoneMode;
+  timezoneLabel: string;
+  utcPreview: string;
 }
 
 export interface CliOptions {
@@ -41,6 +43,8 @@ export interface CliOptions {
   kafkaPort: number;
   localPort: number;
   group?: string;
+  groupPrefix?: string;
+  selectGroups: boolean;
   topics: string[];
   selectTopics: boolean;
   allTopics: boolean;

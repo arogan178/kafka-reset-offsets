@@ -15,11 +15,14 @@ export function normalizeDateTime(input: string, timezone: TimezoneMode): Normal
   }
 
   if (EPOCH_SECONDS.test(trimmed)) {
+    const kafkaDateTime = formatEpoch(Number(trimmed), 0, timezone);
     return {
       input: trimmed,
-      kafkaDateTime: formatEpoch(Number(trimmed), 0, timezone),
+      kafkaDateTime,
       note: `Epoch seconds converted using ${timezone} timezone`,
       timezone,
+      timezoneLabel: timezoneDescription(timezone),
+      utcPreview: kafkaDateTimeToUtcPreview(kafkaDateTime, timezone),
     };
   }
 
@@ -27,22 +30,28 @@ export function normalizeDateTime(input: string, timezone: TimezoneMode): Normal
     const seconds = Number(trimmed.slice(0, -3));
     const millis = Number(trimmed.slice(-3));
 
+    const kafkaDateTime = formatEpoch(seconds, millis, timezone);
     return {
       input: trimmed,
-      kafkaDateTime: formatEpoch(seconds, millis, timezone),
+      kafkaDateTime,
       note: `Epoch milliseconds converted using ${timezone} timezone`,
       timezone,
+      timezoneLabel: timezoneDescription(timezone),
+      utcPreview: kafkaDateTimeToUtcPreview(kafkaDateTime, timezone),
     };
   }
 
   let match = DATE_ONLY.exec(trimmed);
   if (match) {
     assertDateParts(match[1], match[2], match[3]);
+    const kafkaDateTime = `${match[1]}-${match[2]}-${match[3]}T00:00:00.000`;
     return {
       input: trimmed,
-      kafkaDateTime: `${match[1]}-${match[2]}-${match[3]}T00:00:00.000`,
+      kafkaDateTime,
       note: "Date normalized to start of day",
       timezone,
+      timezoneLabel: timezoneDescription(timezone),
+      utcPreview: kafkaDateTimeToUtcPreview(kafkaDateTime, timezone),
     };
   }
 
@@ -50,11 +59,14 @@ export function normalizeDateTime(input: string, timezone: TimezoneMode): Normal
   if (match) {
     assertDateParts(match[1], match[2], match[3]);
     assertTimeParts(match[4], match[5], "00");
+    const kafkaDateTime = `${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:00.000`;
     return {
       input: trimmed,
-      kafkaDateTime: `${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:00.000`,
+      kafkaDateTime,
       note: "Date/time normalized with seconds and milliseconds",
       timezone,
+      timezoneLabel: timezoneDescription(timezone),
+      utcPreview: kafkaDateTimeToUtcPreview(kafkaDateTime, timezone),
     };
   }
 
@@ -62,11 +74,14 @@ export function normalizeDateTime(input: string, timezone: TimezoneMode): Normal
   if (match) {
     assertDateParts(match[1], match[2], match[3]);
     assertTimeParts(match[4], match[5], match[6]);
+    const kafkaDateTime = `${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:${match[6]}.000`;
     return {
       input: trimmed,
-      kafkaDateTime: `${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:${match[6]}.000`,
+      kafkaDateTime,
       note: "Date/time normalized with milliseconds",
       timezone,
+      timezoneLabel: timezoneDescription(timezone),
+      utcPreview: kafkaDateTimeToUtcPreview(kafkaDateTime, timezone),
     };
   }
 
@@ -75,11 +90,14 @@ export function normalizeDateTime(input: string, timezone: TimezoneMode): Normal
     assertDateParts(match[1], match[2], match[3]);
     assertTimeParts(match[4], match[5], match[6]);
     const fractionalSeconds = match[7] ?? "";
+    const kafkaDateTime = `${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:${match[6]}.${fractionalSeconds.padEnd(3, "0")}`;
     return {
       input: trimmed,
-      kafkaDateTime: `${match[1]}-${match[2]}-${match[3]}T${match[4]}:${match[5]}:${match[6]}.${fractionalSeconds.padEnd(3, "0")}`,
+      kafkaDateTime,
       note: "Provided as Kafka datetime",
       timezone,
+      timezoneLabel: timezoneDescription(timezone),
+      utcPreview: kafkaDateTimeToUtcPreview(kafkaDateTime, timezone),
     };
   }
 
@@ -126,4 +144,32 @@ function formatEpoch(seconds: number, millis: number, timezone: TimezoneMode): s
 
 function pad(value: number): string {
   return String(value).padStart(2, "0");
+}
+
+function timezoneDescription(timezone: TimezoneMode): string {
+  if (timezone === "utc") {
+    return "UTC";
+  }
+
+  const timezoneName = Intl.DateTimeFormat().resolvedOptions().timeZone ?? "local";
+  const offsetMinutes = -new Date().getTimezoneOffset();
+  const sign = offsetMinutes >= 0 ? "+" : "-";
+  const absoluteOffset = Math.abs(offsetMinutes);
+  const hours = Math.floor(absoluteOffset / 60);
+  const minutes = absoluteOffset % 60;
+
+  return `${timezoneName} (UTC${sign}${pad(hours)}:${pad(minutes)})`;
+}
+
+function kafkaDateTimeToUtcPreview(kafkaDateTime: string, timezone: TimezoneMode): string {
+  if (timezone === "utc") {
+    return `${kafkaDateTime} UTC`;
+  }
+
+  const date = new Date(kafkaDateTime);
+  if (Number.isNaN(date.getTime())) {
+    return "Unable to calculate UTC preview";
+  }
+
+  return `${date.toISOString().replace("Z", "")} UTC`;
 }

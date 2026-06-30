@@ -77,6 +77,16 @@ export function buildGroupStateCommand(bootstrapServer: string, group: string, k
   };
 }
 
+export function buildDescribeGroupCommand(bootstrapServer: string, group: string, kafkaConsumerGroups: string, commandConfig?: string): CommandSpec {
+  const args = ["--bootstrap-server", bootstrapServer, "--describe", "--group", group];
+  addCommandConfig(args, commandConfig);
+
+  return {
+    command: kafkaConsumerGroups,
+    args,
+  };
+}
+
 export function buildListTopicsCommand(bootstrapServer: string, kafkaTopics: string, commandConfig?: string): CommandSpec {
   const args = ["--bootstrap-server", bootstrapServer, "--list"];
   addCommandConfig(args, commandConfig);

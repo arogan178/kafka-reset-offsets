@@ -1,4 +1,5 @@
 import { spawn, type ChildProcess } from "node:child_process";
+import { createConnection } from "node:net";
 import type { CommandSpec } from "./kafkaCli.js";
 import { runBuffered } from "./process.js";
 
@@ -76,7 +77,8 @@ export async function startPortForward(config: PortForwardConfig): Promise<PortF
     stdio: ["ignore", "pipe", "pipe"],
   });
 
-  await waitForPortForward(child);
+  console.log(`Opening port-forward: kubectl ${args.join(" ")}`);
+  await waitForPortForward(child, config.localPort);
 
   return {
     bootstrapServer: `127.0.0.1:${config.localPort}`,
@@ -95,14 +97,18 @@ function contextArgs(kubeContext?: string): string[] {
   return kubeContext ? ["--context", kubeContext] : [];
 }
 
-function waitForPortForward(child: ChildProcess): Promise<void> {
+function waitForPortForward(child: ChildProcess, localPort: number): Promise<void> {
   return new Promise((resolve, reject) => {
     let settled = false;
     let output = "";
+    let probeTimer: NodeJS.Timeout | undefined;
 
     const timer = setTimeout(() => {
       if (!settled) {
         settled = true;
+        if (probeTimer) {
+          clearInterval(probeTimer);
+        }
         stopChild(child).catch(() => undefined);
         reject(new Error(`Timed out waiting for kubectl port-forward. Output: ${output.trim() || "none"}`));
       }
@@ -113,9 +119,31 @@ function waitForPortForward(child: ChildProcess): Promise<void> {
       if (!settled && output.includes("Forwarding from")) {
         settled = true;
         clearTimeout(timer);
+        if (probeTimer) {
+          clearInterval(probeTimer);
+        }
         resolve();
       }
     };
+
+    probeTimer = setInterval(() => {
+      if (settled) {
+        return;
+      }
+
+      probeLocalPort(localPort)
+        .then((ready) => {
+          if (!settled && ready) {
+            settled = true;
+            clearTimeout(timer);
+            if (probeTimer) {
+              clearInterval(probeTimer);
+            }
+            resolve();
+          }
+        })
+        .catch(() => undefined);
+    }, 250);
 
     child.stdout?.on("data", onData);
     child.stderr?.on("data", onData);
@@ -123,6 +151,9 @@ function waitForPortForward(child: ChildProcess): Promise<void> {
       if (!settled) {
         settled = true;
         clearTimeout(timer);
+        if (probeTimer) {
+          clearInterval(probeTimer);
+        }
         reject(error);
       }
     });
@@ -130,8 +161,32 @@ function waitForPortForward(child: ChildProcess): Promise<void> {
       if (!settled) {
         settled = true;
         clearTimeout(timer);
+        if (probeTimer) {
+          clearInterval(probeTimer);
+        }
         reject(new Error(`kubectl port-forward exited with code ${code ?? "unknown"}. Output: ${output.trim() || "none"}`));
       }
+    });
+  });
+}
+
+function probeLocalPort(localPort: number): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = createConnection({ host: "127.0.0.1", port: localPort });
+
+    socket.once("connect", () => {
+      socket.destroy();
+      resolve(true);
+    });
+
+    socket.once("error", () => {
+      socket.destroy();
+      resolve(false);
+    });
+
+    socket.setTimeout(200, () => {
+      socket.destroy();
+      resolve(false);
     });
   });
 }

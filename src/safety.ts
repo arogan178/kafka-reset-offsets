@@ -34,7 +34,44 @@ export function printPlanSummary(plan: ResetPlan): void {
 
   console.log(`  Input time: ${plan.normalizedDateTime.input}`);
   console.log(`  Kafka time: ${plan.normalizedDateTime.kafkaDateTime}`);
+  console.log(`  Timezone:   ${plan.normalizedDateTime.timezoneLabel}`);
+  console.log(`  UTC time:   ${plan.normalizedDateTime.utcPreview}`);
   console.log(`  Time note:  ${plan.normalizedDateTime.note}`);
+  console.log("");
+}
+
+export function printBatchPlanSummary(plans: ResetPlan[]): void {
+  if (plans.length === 1) {
+    printPlanSummary(plans[0]!);
+    return;
+  }
+
+  const firstPlan = plans[0]!;
+
+  console.log("");
+  console.log("Review the reset targets:");
+
+  if (firstPlan.connection.mode === "kubernetes") {
+    console.log("  Connection: Kubernetes port-forward");
+    console.log(`  Context:    ${firstPlan.connection.kubeContext ?? "current kubectl context"}`);
+    console.log(`  Namespace:  ${firstPlan.connection.namespace}`);
+    console.log(`  Service:    ${firstPlan.connection.kafkaService}`);
+    console.log(`  Bootstrap:  ${firstPlan.connection.bootstrapServer}`);
+  } else {
+    console.log("  Connection: Direct Kafka bootstrap server");
+    console.log(`  Bootstrap:  ${firstPlan.connection.bootstrapServer}`);
+  }
+
+  console.log(`  Groups:     ${plans.length} selected`);
+  for (const plan of plans) {
+    const topics = plan.topicSelection.mode === "all" ? "all topics" : plan.topicSelection.topics.join(", ");
+    console.log(`              ${plan.group} -> ${topics}`);
+  }
+  console.log(`  Input time: ${firstPlan.normalizedDateTime.input}`);
+  console.log(`  Kafka time: ${firstPlan.normalizedDateTime.kafkaDateTime}`);
+  console.log(`  Timezone:   ${firstPlan.normalizedDateTime.timezoneLabel}`);
+  console.log(`  UTC time:   ${firstPlan.normalizedDateTime.utcPreview}`);
+  console.log(`  Time note:  ${firstPlan.normalizedDateTime.note}`);
   console.log("");
 }
 
@@ -56,6 +93,28 @@ export async function confirmExecute(plan: ResetPlan): Promise<void> {
 
   const expected = `RESET ${plan.group}`;
   const actual = await askInput(`Type exactly '${expected}' to apply the reset`);
+
+  if (actual !== expected) {
+    throw new Error("Confirmation did not match");
+  }
+}
+
+export async function confirmBatchExecute(plans: ResetPlan[]): Promise<void> {
+  if (plans.length === 0) {
+    throw new Error("No reset plans selected");
+  }
+
+  if (plans.every((plan) => plan.yes)) {
+    return;
+  }
+
+  const consumersStopped = await askConfirm(`Have all consumers for ${plans.length} selected group(s) been stopped?`, false);
+  if (!consumersStopped) {
+    throw new Error("Consumers must be stopped before executing the reset");
+  }
+
+  const expected = `RESET ${plans.length} GROUPS`;
+  const actual = await askInput(`Type exactly '${expected}' to apply the resets`);
 
   if (actual !== expected) {
     throw new Error("Confirmation did not match");

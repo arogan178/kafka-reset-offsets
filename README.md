@@ -10,6 +10,7 @@ The tool wraps Kafka's official `kafka-consumer-groups --reset-offsets --to-date
 - Searchable checkbox topic selector: type to filter, press `space` to toggle topics, press `enter` to confirm.
 - Dry-run first, always.
 - Final confirmation phrase before applying changes.
+- Post-execute verification by comparing current offsets with the dry-run plan.
 
 ## Operator Requirements
 
@@ -74,9 +75,9 @@ The wizard asks for:
 
 - Connection mode: direct bootstrap server or Kubernetes port-forward.
 - Kafka CLI/client config if needed.
-- Consumer group.
-- Topics: searchable checkbox multi-select, typed list, or all topics in the group.
-- Backdated date/time or timestamp.
+- Consumer group prefix and searchable checkbox group selection.
+- Topics inferred from each selected consumer group, or manually selected when needed.
+- Backdated date/time or timestamp, followed by an explicit local-vs-UTC timezone choice.
 - Whether to apply after reviewing the dry-run output.
 
 ## Connection Modes
@@ -87,7 +88,6 @@ Use direct Kafka access when Kafka is reachable from your machine:
 kafka-reset-offsets \
   --bootstrap-server localhost:9092 \
   --group my-consumer-group \
-  --topic orders \
   --datetime 2026-06-29
 ```
 
@@ -98,8 +98,8 @@ kafka-reset-offsets \
   --kube-context example-dev \
   --namespace kafka \
   --kafka-service kafka-bootstrap \
-  --group my-consumer-group \
-  --select-topics \
+  --group-prefix corex_ \
+  --select-groups \
   --datetime 2026-06-29
 ```
 
@@ -116,6 +116,12 @@ In the wizard, the CLI can discover options dynamically:
 - Services via `kubectl -n <namespace> get services -o json`.
 
 If Kubernetes permissions block discovery, the wizard falls back to manual entry.
+
+## Client Properties
+
+If `client.properties` exists in the directory where you run the CLI, the wizard uses it by default. It will only ask for a different client properties file if you choose to override it.
+
+Pass `--command-config <file>` to use a specific file non-interactively.
 
 ## Timestamp Formats
 
@@ -139,7 +145,31 @@ kafka-reset-offsets \
   --timezone utc
 ```
 
-## Multi-Topic Resets
+## Multi-Consumer-Group Resets
+
+Offset resets are scoped to consumer groups. In the guided flow, you can enter a consumer group prefix, then select multiple matching groups from a searchable checkbox list:
+
+- Type to filter.
+- Press `space` to select or unselect consumer groups.
+- Press `enter` to confirm.
+
+For each selected group, the CLI runs `kafka-consumer-groups --describe --group <group>` and infers the topic or topics consumed by that group. It then runs one dry-run reset command per consumer group.
+
+If a selected group has no committed-offset rows yet, the CLI can fall back to the consumer group naming convention `groupPrefix-topicName`. The prefix is only used for consumer group filtering and is stripped before creating the reset command. For example, prefix `apf_cert-data_stg` and group `apf_cert-data_stg-endeavour_bonuses_user_profile_bonuses` map to source topic `endeavour_bonuses_user_profile_bonuses`.
+
+If you leave the filtering prefix blank and select groups manually, the wizard asks for an optional prefix to strip for topic inference. Leaving that blank uses a fallback that drops the first two hyphen-separated group segments, so `source-target-topic` maps to `topic`.
+
+Example:
+
+```bash
+kafka-reset-offsets \
+  -b localhost:9092 \
+  --group-prefix corex_ \
+  --select-groups \
+  -d 2026-06-29
+```
+
+## Manual Topic Resets
 
 Interactive topic selection uses a searchable checkbox list:
 
@@ -186,6 +216,8 @@ kafka-reset-offsets \
 ```
 
 Kafka resets each partition to the earliest offset whose record timestamp is greater than or equal to the provided datetime.
+
+After execution, the CLI runs `kafka-consumer-groups --describe` for each selected group and compares `CURRENT-OFFSET` with the offsets from the dry-run `NEW-OFFSET` plan. If the output cannot be parsed, it still prints the describe output so the operator can verify manually.
 
 ## Legacy Bash Script
 

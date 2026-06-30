@@ -5,6 +5,8 @@ coverage/
 .env
 .env.*
 !.env.example
+client.properties
+*.client.properties
 
 *.log
 npm-debug.log*

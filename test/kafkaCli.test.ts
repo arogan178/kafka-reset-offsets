@@ -62,6 +62,8 @@ function basePlan(): ResetPlan {
       kafkaDateTime: "2026-06-29T00:00:00.000",
       note: "Date normalized to start of day",
       timezone: "local",
+      timezoneLabel: "Europe/Malta (UTC+02:00)",
+      utcPreview: "2026-06-28T22:00:00.000 UTC",
     },
     execute: false,
     yes: false,

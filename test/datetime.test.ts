@@ -15,11 +15,22 @@ describe("normalizeDateTime", () => {
   });
 
   it("converts epoch seconds in UTC mode", () => {
-    expect(normalizeDateTime("1782737100", "utc").kafkaDateTime).toBe("2026-06-29T12:45:00.000");
+    const normalized = normalizeDateTime("1782737100", "utc");
+
+    expect(normalized.kafkaDateTime).toBe("2026-06-29T12:45:00.000");
+    expect(normalized.timezoneLabel).toBe("UTC");
+    expect(normalized.utcPreview).toBe("2026-06-29T12:45:00.000 UTC");
   });
 
   it("converts epoch milliseconds in UTC mode", () => {
     expect(normalizeDateTime("1782737100123", "utc").kafkaDateTime).toBe("2026-06-29T12:45:00.123");
+  });
+
+  it("includes timezone context for local inputs", () => {
+    const normalized = normalizeDateTime("2026-06-29T13:45:00.123", "local");
+
+    expect(normalized.timezoneLabel).toContain("UTC");
+    expect(normalized.utcPreview).toContain("UTC");
   });
 
   it("rejects invalid calendar dates", () => {
