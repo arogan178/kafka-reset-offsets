@@ -1,5 +1,7 @@
 # Kafka Reset Offsets
 
+[![CI](https://github.com/arogan178/kafka-reset-offsets/actions/workflows/ci.yml/badge.svg)](https://github.com/arogan178/kafka-reset-offsets/actions/workflows/ci.yml)
+
 Interactive TypeScript CLI for safely resetting a Kafka consumer group's offsets to a backdated date, datetime, or epoch timestamp.
 
 The tool wraps Kafka's official `kafka-consumer-groups --reset-offsets --to-datetime` command, but adds guardrails:
